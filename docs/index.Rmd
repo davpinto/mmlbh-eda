@@ -1,0 +1,45 @@
+---
+title:  "Análise Exploratória de Dados usando R"
+author: "David Pinto"
+date:   "23 Fev 2017"
+output:
+  prettydoc::html_pretty:
+    theme: hpstr
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, message = FALSE, warning = FALSE)
+```
+
+> III Meetup ML, Belo Horizonte
+
+Neste tutorial você aprenderá a usar o `R` e suas principais bibliotecas de manipulação e visualização de dados para fazer **Análise Exploratória de Dados** (EDA - *Exploratory Data Analysis*).
+
+## Base de Dados *NYC Flights*
+
+A base de Dados **NYC Flights** contém informações sobre todos os vôos que saíram da cidade de Nova Iorque no ano de 2014: 253316 vôos no total.
+
+```{r, results='hide', }
+library("readr")
+
+## Import dataset
+flights <- readr::read_csv("./data/flights.csv.zip")
+head(flights, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(flights, n = 5))
+```
+
+A base de dados disponibiliza as seguintes informações: horário de saída e chegada dos vôos, atraso em minutos na saída e na chegada dos vôos, aeroportos de origem e destino, e distância total percorrida em Km. Quais **insights** podemos extrair desses dados?
+
+Vamos começar enumerando as **perguntas** que queremos responder:
+
+1. Quantos vôos saíram atrasados de cada aeroporto?
+1. O aeroporto de destino tem influência nos atrasos de saída dos vôos?
+1. Qual o aeroporto mais disciplinado com os horários de saída?
+1. O tempo de atraso na chegada está correlacionado com o tempo de atraso na saída?
+1. O tempo de atraso na chegada está correlacionado com a distância do vôo?
+1. Qual o comportamento dos atrasos ao longo dos meses do ano?
+1. Existe algum dia da semana ou horário do dia com maior incidência de atrasos para determinado aeroporto?

@@ -56,4 +56,4 @@ EDA Usando R
 
 Neste tutorial vamos aprender a usar as ferramentas anteriormente citadas para fazer **Análise Exploratória de Dados** (EDA - *Exploratory Data Analysis*), uma parte essencial do trabalho de um cientista de dados, cujo principal objetivo é conhecer melhor os dados antes da aplicação das técnicas de **Machine Learning**.
 
-Vamos ao trabalho? Acesse o material: [Análise de Dados na Prática usando R]().
+Vamos ao trabalho? Acesse o material: [Análise de Dados na Prática usando R](https://davpinto.github.io/mmlbh-eda).

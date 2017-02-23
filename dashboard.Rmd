@@ -1,0 +1,98 @@
+---
+title: "Heatmap of Delayed Flights"
+author: "David Pinto"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: embed
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+## Load required packages
+library("readr")
+library("ggplot2")
+library("viridis")
+library("lubridate")
+library("magrittr")
+library("tidyr")
+library("dplyr")
+
+## Import dataset
+flights <- readr::read_csv("./data/flights.csv.zip") %>% 
+   na.omit() %>% 
+   tidyr::unite("flight", origin, dest, sep = "-")
+```
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+flight.name <- unique(flights$flight)
+names(flight.name) <- flight.name
+selectInput("flight", label = h3("Flight"), 
+            choices = as.list(flight.name), 
+            selected = 1)
+```
+
+Select a flight to analyse departure delays.
+
+Row
+-----------------------------------------------------------------------
+
+### Heatmap
+    
+```{r}
+getFlightData <- reactive({
+   flights %>% 
+      dplyr::filter(flight == input$flight) %>% 
+      dplyr::mutate(dep_weekday = weekdays(dep_time, abbreviate = TRUE)) %>%
+      dplyr::mutate(dep_month = lubridate::month(dep_time)) %>% 
+      dplyr::mutate(dep_weekday = factor(dep_weekday, c("Dom","Seg","Ter","Qua",
+                                                        "Qui","Sex","Sáb"))) %>% 
+      dplyr::mutate(dep_month = factor(dep_month, sort(unique(dep_month))))
+})
+renderPlot({
+   dt <- getFlightData() %>% 
+      dplyr::group_by(dep_month, dep_weekday) %>% 
+      dplyr::summarise(rate = sum(dep_delay > 0) / n()) %>% 
+      dplyr::ungroup()
+   ggplot(dt, aes(x = dep_month, y = dep_weekday, fill = rate)) +
+      geom_tile(color = "gray93", size = 1, alpha = 0.8) +
+      geom_text(aes(label = round(rate, 2)), color = "white") +
+      viridis::scale_fill_viridis(direction = -1, guide = "none") +
+      scale_x_discrete(expand = c(.01, .01)) +
+      scale_y_discrete(expand = c(.01, .01)) +
+      theme_gray(base_family = "Helvetica", base_size = 14) +
+      labs(x = "Month", y = "Weekday")
+})
+```
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+### Boxplot
+    
+```{r}
+renderPlot({
+   dt <- getFlightData() %>% 
+      dplyr::filter(dep_delay > quantile(dep_delay, 0.1), 
+                    dep_delay < quantile(dep_delay, 0.9))
+   
+   ggplot(aes(x = dep_month, y = dep_delay), data = dt) +
+      geom_jitter(width = 0.2, color = "gray40", alpha = 0.6, size = 1) +
+      geom_boxplot(outlier.shape = NA, alpha = 0.6, size = 0.6) +
+      labs(x = "Month", y = "Delay (min)")
+})
+```
+   
+### Data for Selected Flight
+
+```{r}
+renderTable(
+   getFlightData() %>% 
+      select(flight, dep_month, dep_weekday, dep_delay) %>% 
+      head(n = 100)
+)
+```

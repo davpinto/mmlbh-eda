@@ -9,7 +9,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, message = FALSE, 
+                      warning = FALSE, fig.align = "center")
 ```
 
 > III Meetup ML, Belo Horizonte
@@ -20,7 +21,7 @@ Neste tutorial você aprenderá a usar o `R` e suas principais bibliotecas de ma
 
 A base de Dados **NYC Flights** contém informações sobre todos os vôos que saíram da cidade de Nova Iorque no ano de 2014: 253316 vôos no total.
 
-```{r, results='hide', }
+```{r, results='hide'}
 library("readr")
 
 ## Import dataset
@@ -34,7 +35,7 @@ knitr::kable(head(flights, n = 5))
 
 A base de dados disponibiliza as seguintes informações: horário de saída e chegada dos vôos, atraso em minutos na saída e na chegada dos vôos, aeroportos de origem e destino, e distância total percorrida em Km. Quais **insights** podemos extrair desses dados?
 
-Vamos começar enumerando as **perguntas** que queremos responder:
+A melhor forma de começar consiste em enumerar as **perguntas** que queremos responder. Exemplo:
 
 1. Quantos vôos saíram atrasados de cada aeroporto?
 1. O aeroporto de destino tem influência nos atrasos de saída dos vôos?
@@ -43,3 +44,320 @@ Vamos começar enumerando as **perguntas** que queremos responder:
 1. O tempo de atraso na chegada está correlacionado com a distância do vôo?
 1. Qual o comportamento dos atrasos ao longo dos meses do ano?
 1. Existe algum dia da semana ou horário do dia com maior incidência de atrasos para determinado aeroporto?
+
+## Atraso médio dos vôos saindo de EWR
+
+Vamos utilizar o pacote `dplyr` para manipulação dos dados. Resolveremos problemas complexos quebrando em pequenas partes. Com os **verbos** básicos do `dplyr` conseguiremos fazer diversos tipos de análise:
+
+- `filter()` e `select()`: seleção de subconjuntos da base de dados
+- `mutate()`: tranformação de variáveis e criação de novas
+- `summarize()`: simplificação das variáveis em estatísticas resumo
+- `arrange()`: reordenação dos dados
+- `join()`: união de diferentes bases de dados
+
+Geralmente, uma análise será composta por uma combinação sequencial de chamadas aos métodos do `dplyr`. Existem 3 maneiras distintas de combinar as chamadas.
+
+### Chamada usando variáveis intermediárias
+
+É uma maneira confusa, pois é muito difícil atribuir nomes coerentes a cada uma das variáveis intermediárias.
+
+```{r, results='hide'}
+library("dplyr")
+
+delays1 <- dplyr::group_by(flights, origin, dest)
+delays2 <- dplyr::summarise(delays1, delay = mean(dep_delay), num = n())
+delays3 <- dplyr::filter(delays2, origin == "EWR")
+delays4 <- dplyr::top_n(delays3, n = 10, wt = delay)
+delays  <- dplyr::arrange(delays4, desc(delay))
+head(delays, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(delays, n = 5))
+```
+
+### Chamada aninhada
+
+É sem dúvidas a maneira mais difícil de ler o código.
+
+```{r}
+delays <- dplyr::arrange(
+   dplyr::top_n(
+      dplyr::filter(
+         dplyr::summarise(
+            dplyr::group_by(
+               flights, origin, dest
+            ), delay = mean(dep_delay), num = n()
+         ), origin == "EWR"
+      ), n = 10, wt = delay
+   ), desc(delay)
+)
+head(delays, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(delays, n = 5))
+```
+
+### Chamada usando operador de pipeline
+
+É a maneira mais limpa de ler a sequência de chamadas e não requer nomes intermediários. Para isso usamos o operador `%>%` (*pipe operator*). A análise com `dplyr` é de fato um pipeline de processamento dos dados.
+
+```{r, results='hide'}
+library("magrittr")
+
+delays <- flights %>% 
+   dplyr::group_by(origin, dest) %>% 
+   dplyr::summarise(delay = mean(dep_delay), num = n()) %>% 
+   dplyr::filter(origin == "EWR") %>% 
+   dplyr::top_n(n = 10, wt = delay) %>% 
+   dplyr::arrange(desc(delay))
+head(delays, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(delays, n = 5))
+```
+
+## Visualização dos atrasos em EWR
+
+Para visualização dos dados utilizaremos o pacote `ggplot2`, que segue os conceitos contidos no livro [The Grammar of Graphics](https://www.amazon.com/Grammar-Graphics-Statistics-Computing/dp/0387245448). Os gráficos são construídos também em etapas, adicionando camadas (*layers*). Fica mais fácil de entender exemplificando:
+
+```{r}
+library("ggplot2")
+library("viridis")
+
+dt <- delays %>% 
+   dplyr::mutate(delay = round(delay, 2)) %>% 
+   tidyr::unite(col = "flight", origin, dest, sep = "-")
+
+g <- ggplot(aes(x = flight, y = delay), data = dt) +
+   geom_bar(stat = "identity") +
+   labs(x = "Flight", y = "Delay (min)", title = "Average Delays", 
+        subtitle = "Flights from EWR")
+plot(g)
+```
+
+Podemos deixar esse gráfico de barras muito mais apresentável:
+
+```{r}
+g <- ggplot(aes(x = reorder(flight, delay), y = delay, 
+                fill = reorder(flight, delay)), data = dt) +
+   geom_bar(width = 0.7, stat = "identity", color = "white", size = 0.5) +
+   coord_flip() +
+   geom_text(aes(label = delay), nudge_y = -4, color = "white", size = 4, 
+             fontface = "bold") +
+   viridis::scale_fill_viridis(direction = -1, discrete = TRUE, guide = "none") +
+   labs(x = "Flight", y = "Delay (min)", title = "Average Delays", 
+        subtitle = "Flights from EWR")
+plot(g)
+```
+
+### Distribuição dos atrasos
+
+A análise anterior nos deu uma ideia da média dos atrasos. Mas como esses atrasos variam em torno da média? Para responder a essa pergunta, vamos utilizar um recusos gráfico conhecido como *boxplot*, que resume a tendência central e a dispersão dos dados.
+
+Primeiramente, vamos escolher os 10 destinos mais frequentes saindo de `EWR` e remover os valores extremos dos atrasos, para podermos visualizar melhor os dados:
+
+```{r}
+dt <- flights %>% 
+   dplyr::filter(origin == "EWR") %>% 
+   dplyr::group_by(dest) %>% 
+   dplyr::summarise(num = n()) %>% 
+   dplyr::top_n(n = 10, wt = num)
+
+dt <- flights %>% 
+   dplyr::filter(origin == "EWR", dest %in% dt$dest) %>%
+   dplyr::filter(dep_delay > 0) %>% 
+   dplyr::filter(dep_delay > quantile(dep_delay, 0.1), 
+          dep_delay < quantile(dep_delay, 0.9)) %>% 
+   dplyr::select(origin, dest, dep_delay)
+```
+
+Agora nosso boxplot:
+
+```{r}
+g <- ggplot(aes(x = dest, y = dep_delay), data = dt) +
+   geom_boxplot(outlier.shape = NA) +
+   labs(x = "Destination", y = "Delay (min)", title = "Distribution of Delays", 
+        subtitle = "Flights from EWR")
+plot(g)
+```
+
+Assim como fizemos para o gráfico de barras, vamos tornar o boxplot mais apresentável:
+
+```{r}
+g <- ggplot(aes(x = dest, y = dep_delay, fill = dest), data = dt) +
+   geom_jitter(width = 0.2, color = "gray40", alpha = 0.6, size = 1) +
+   geom_boxplot(outlier.shape = NA, alpha = 0.6, size = 0.6) +
+   viridis::scale_fill_viridis(discrete = TRUE, guide = "none") +
+   viridis::scale_color_viridis(discrete = TRUE, guide = "none") +
+   labs(x = "Destination", y = "Delay (min)", title = "Distribution of Delays", 
+        subtitle = "Flights from EWR")
+plot(g)
+```
+
+Acesse o site [R Graph Gallery](http://www.r-graph-gallery.com/) e busque inspiração por meio de vários exemplos de visualização de dados usando `ggplot2` e alguns outros recursos gráficos do `R`.
+
+## Atraso médio do vôo JFK-LAX ao longo do ano
+
+Vamos agora utilizar o pacote `lubridate` para extrair informação das variáveis de data. Escolhemos o vôo `JFK-LAX` para exemplificar, pois ele é o mais frequente:
+
+```{r, results='hide'}
+library("tidyr")
+
+dt <- flights %>% 
+   dplyr::filter(dep_delay > 0) %>% 
+   tidyr::unite("flight", origin, dest, sep = "-") %>% 
+   dplyr::group_by(flight) %>% 
+   dplyr::summarise(num = n()) %>% 
+   dplyr::ungroup() %>% 
+   dplyr::arrange(desc(num))
+head(dt, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(dt, n = 5))
+```
+
+Vamos criar a variável `dep_month`, contendo o mês do embarque de cada vôo:
+
+```{r}
+dt <- flights %>% 
+   na.omit() %>% 
+   dplyr::filter(dep_delay > 0) %>% 
+   tidyr::unite("flight", origin, dest, sep = "-") %>% 
+   dplyr::filter(flight == "JFK-LAX") %>% 
+   dplyr::mutate(dep_month = lubridate::month(dep_time)) %>% 
+   dplyr::group_by(dep_month) %>% 
+   dplyr::summarize(delay_mean = median(dep_delay), delay_sd = IQR(dep_delay), 
+                    count = n())
+```
+
+Agora vamos plotar o atraso médio ao longo do ano:
+
+```{r}
+g <- ggplot(aes(x = dep_month, y = delay_mean), data = dt) +
+   geom_ribbon(aes(ymin = delay_mean - delay_sd, ymax = delay_mean + delay_sd), 
+               alpha = 0.2) +
+   geom_line(size = 1, color = "#482878FF", alpha = 0.6) +
+   geom_point(size = 3, color = "#482878FF", alpha = 0.8) +
+   scale_x_continuous(breaks = unique(dt$dep_month)) +
+   labs(x = "Month", y = "Delay (min)", title = "Delay Trends", 
+        subtitle = "Flight from JFK to LAX") +
+   theme_bw()
+plot(g)
+```
+
+## Número de atrasos por dia da semana
+
+Será que o dia da semana tem influência nos atrasos? Vamos utilizar um outro tipo de recurso gráfico, chamado *heatmap*, para visualizar a **taxa de atrasos** por dia da semana ao longo do ano. Vamos escolher novamente o vôo `JFK-LAX` para exemplificar.
+
+```{r, results='hide'}
+dt <- flights %>% 
+   na.omit() %>% 
+   tidyr::unite("flight", origin, dest, sep = "-") %>% 
+   dplyr::filter(flight == "JFK-LAX") %>% 
+   dplyr::mutate(dep_weekday = weekdays(dep_time, abbreviate = TRUE)) %>%
+   dplyr::mutate(dep_month = lubridate::month(dep_time)) %>% 
+   dplyr::mutate(dep_weekday = factor(dep_weekday, c("Dom","Seg","Ter","Qua",
+                                                     "Qui","Sex","Sáb"))) %>% 
+   dplyr::mutate(dep_month = factor(dep_month, sort(unique(dep_month)))) %>% 
+   dplyr::group_by(dep_month, dep_weekday) %>% 
+   dplyr::summarise(rate = sum(dep_delay > 0) / n()) %>% 
+   dplyr::ungroup()
+head(dt, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(dt, n = 5))
+```
+
+O *heamap* permite visualizar 3 variáveis usando apenas 2 dimensões:
+
+```{r}
+g <- ggplot(dt, aes(x = dep_month, y = dep_weekday, fill = rate)) +
+   geom_tile(color = "gray93", size = 1, alpha = 0.8) +
+   geom_text(aes(label = round(rate, 2)), color = "white") +
+   viridis::scale_fill_viridis(direction = -1, guide = "none") +
+   theme_gray(base_family = "Helvetica", base_size = 14) +
+   labs(x = "Month", y = "Weekday")
+plot(g)
+```
+
+## Localização dos Aeroportos
+
+Vamos combinar os dados dos vôos com uma nova base de dados, contendo informações detalhadas de cada aeroporto.
+
+```{r, results='hide'}
+airports <- readr::read_csv("./data/airports.csv.zip")
+head(airports, n = 5)
+```
+
+```{r, echo=FALSE}
+knitr::kable(head(airports, n = 5))
+```
+
+O pacote `ggmap` permite inserir mapas como camadas do `ggplot2`. Vamos utilizá-lo para plotar a localização dos aeroportos de origem e destino:
+
+```{r, fig.height=8}
+library("ggmap")
+
+orig <- airports %>% 
+   dplyr::filter(faa %in% unique(flights$origin))
+dest <- airports %>% 
+   dplyr::filter(faa %in% unique(flights$dest))
+
+map <- ggmap::get_map("United States", zoom = 4, maptype = "terrain", 
+                      scale = 2, color = "bw")
+g <- ggmap::ggmap(map, extent = "device", darken = 0.1) +
+   stat_density2d(data = dest, aes(x = lon, y = lat, fill = ..level.., 
+                                   alpha = ..level..), 
+                  size = 0.01, bins = 10, geom = "polygon") + 
+   geom_density2d(data = dest, aes(x = lon, y = lat, color = ..level..), 
+                  size = 0.5, bins = 15, alpha = 0.8) + 
+   geom_point(aes(lon, lat), data = dest, size = 2, shape = 18, 
+              alpha = 0.8, color = "black") +
+   geom_point(aes(lon, lat), data = orig, size = 2, shape = 13, 
+              alpha = 0.8, color = "black") +
+   scale_color_gradientn(colors = heat.colors(100)[80:5], guide = "none") + 
+   scale_fill_gradientn(colors = heat.colors(100)[80:5], guide = "none") + 
+   scale_alpha(range = c(0.1, 0.4), guide = "none")
+plot(g)
+```
+
+## Como usar as ferramentas em produção?
+
+O pacote `dplyr`, além de *data.frames*, aceita como entrada tabelas de diferentes bancos relacionais. Exemplo:
+
+```{r, eval=FALSE}
+db <- dplyr::src_postgres(
+   dbname = Sys.getenv("POSTGRES_DBNAME"),
+   port = Sys.getenv("POSTGRES_PORT"),
+   host = Sys.getenv("POSTGRES_HOST"),
+   user = Sys.getenv("POSTGRES_USER"),
+   password = Sys.getenv("POSTGRES_PASS")
+)
+my.tbl <- dplyr::tbl(db, "tbl_name")
+my.tbl <- dplyr::tbl(db, dplyr::sql("SELECT * FROM tbl_name LIMIT 50"))
+dt <- my.tbl %>%
+   dplyr::filter() %>% 
+   dplyr::mutate() %>% 
+   dplyr::select() %>% 
+   dplyr::collect()
+```
+
+É possível também manipular [Spark](http://spark.apache.org/) data frames usando `dplyr`, por meio do pacote [sparklyr](http://spark.rstudio.com/dplyr.html). Exemplo:
+
+```{r, eval=FALSE}
+library("sparklyr")
+library("dplyr")
+
+sc <- spark_connect(master="local")
+flights <- copy_to(sc, flights, "flights")
+dt <- flights %>% 
+   dplyr::filter() %>% 
+   dplyr::group_by() %>% 
+   dplyr::summarise() %>% 
+   dplyr::collect()
+```

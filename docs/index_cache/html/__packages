@@ -1,2 +1,8 @@
 base
 readr
+ggplot2
+ggmap
+magrittr
+dplyr
+viridis
+tidyr

@@ -8,8 +8,14 @@ output:
     highlight: github
 ---
 
+<!-- Helpful links -->
+<!-- 1. https://cran.rstudio.com/web/packages/dplyr/vignettes/introduction.html -->
+<!-- 2. https://github.com/UCIDataScienceInitiative/AdvancedRWorkshop/tree/master/DataProcessing%20in%20R -->
+<!-- 3. https://rstudio-pubs-static.s3.amazonaws.com/115069_cc582a0f3464449fbe21e5999fb73126.html -->
+<!-- 4. https://rpubs.com/NickGonzaga11/dplyrtidyr -->
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, message = FALSE, 
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, message = FALSE, 
                       warning = FALSE, fig.align = "center")
 ```
 
@@ -19,7 +25,7 @@ Neste tutorial você aprenderá a usar o `R` e suas principais bibliotecas de ma
 
 ## Base de Dados *NYC Flights*
 
-A base de Dados **NYC Flights** contém informações sobre todos os vôos que saíram da cidade de Nova Iorque no ano de 2014: 253316 vôos no total.
+A base de Dados [NYC Flights](https://github.com/arunsrinivasan/flights/wiki/NYC-Flights-2014-data) contém informações sobre todos os vôos que saíram da cidade de Nova Iorque no ano de 2014: 253316 vôos no total.
 
 ```{r, results='hide'}
 library("readr")
@@ -80,7 +86,7 @@ knitr::kable(head(delays, n = 5))
 
 É sem dúvidas a maneira mais difícil de ler o código.
 
-```{r}
+```{r, results='hide'}
 delays <- dplyr::arrange(
    dplyr::top_n(
       dplyr::filter(
@@ -124,6 +130,7 @@ knitr::kable(head(delays, n = 5))
 Para visualização dos dados utilizaremos o pacote `ggplot2`, que segue os conceitos contidos no livro [The Grammar of Graphics](https://www.amazon.com/Grammar-Graphics-Statistics-Computing/dp/0387245448). Os gráficos são construídos também em etapas, adicionando camadas (*layers*). Fica mais fácil de entender exemplificando:
 
 ```{r}
+library("tidyr")
 library("ggplot2")
 library("viridis")
 
@@ -204,8 +211,6 @@ Acesse o site [R Graph Gallery](http://www.r-graph-gallery.com/) e busque inspir
 Vamos agora utilizar o pacote `lubridate` para extrair informação das variáveis de data. Escolhemos o vôo `JFK-LAX` para exemplificar, pois ele é o mais frequente:
 
 ```{r, results='hide'}
-library("tidyr")
-
 dt <- flights %>% 
    dplyr::filter(dep_delay > 0) %>% 
    tidyr::unite("flight", origin, dest, sep = "-") %>% 
@@ -231,7 +236,8 @@ dt <- flights %>%
    dplyr::mutate(dep_month = lubridate::month(dep_time)) %>% 
    dplyr::group_by(dep_month) %>% 
    dplyr::summarize(delay_mean = median(dep_delay), delay_sd = IQR(dep_delay), 
-                    count = n())
+                    count = n()) %>% 
+   dplyr::ungroup()
 ```
 
 Agora vamos plotar o atraso médio ao longo do ano:
@@ -242,7 +248,6 @@ g <- ggplot(aes(x = dep_month, y = delay_mean), data = dt) +
                alpha = 0.2) +
    geom_line(size = 1, color = "#482878FF", alpha = 0.6) +
    geom_point(size = 3, color = "#482878FF", alpha = 0.8) +
-   scale_x_continuous(breaks = unique(dt$dep_month)) +
    labs(x = "Month", y = "Delay (min)", title = "Delay Trends", 
         subtitle = "Flight from JFK to LAX") +
    theme_bw()
@@ -258,11 +263,10 @@ dt <- flights %>%
    na.omit() %>% 
    tidyr::unite("flight", origin, dest, sep = "-") %>% 
    dplyr::filter(flight == "JFK-LAX") %>% 
-   dplyr::mutate(dep_weekday = weekdays(dep_time, abbreviate = TRUE)) %>%
-   dplyr::mutate(dep_month = lubridate::month(dep_time)) %>% 
-   dplyr::mutate(dep_weekday = factor(dep_weekday, c("Dom","Seg","Ter","Qua",
-                                                     "Qui","Sex","Sáb"))) %>% 
-   dplyr::mutate(dep_month = factor(dep_month, sort(unique(dep_month)))) %>% 
+   dplyr::mutate(dep_weekday = lubridate::wday(dep_time, label = TRUE, 
+                                               abbr = TRUE)) %>%
+   dplyr::mutate(dep_month = lubridate::month(dep_time, label = TRUE, 
+                                              abbr = TRUE)) %>% 
    dplyr::group_by(dep_month, dep_weekday) %>% 
    dplyr::summarise(rate = sum(dep_delay > 0) / n()) %>% 
    dplyr::ungroup()

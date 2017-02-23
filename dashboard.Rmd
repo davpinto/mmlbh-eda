@@ -9,6 +9,8 @@ output:
 runtime: shiny
 ---
 
+<!-- Online at: https://beta.rstudioconnect.com/content/2555/ -->
+
 ```{r global, include=FALSE}
 ## Load required packages
 library("readr")
@@ -29,11 +31,11 @@ Inputs {.sidebar}
 -----------------------------------------------------------------------
 
 ```{r}
-flight.name <- unique(flights$flight)
+flight.name <- sort(unique(flights$flight))
 names(flight.name) <- flight.name
 selectInput("flight", label = h3("Flight"), 
             choices = as.list(flight.name), 
-            selected = 1)
+            selected = "JFK-LAX")
 ```
 
 Select a flight to analyse departure delays.
@@ -47,23 +49,21 @@ Row
 getFlightData <- reactive({
    flights %>% 
       dplyr::filter(flight == input$flight) %>% 
-      dplyr::mutate(dep_weekday = weekdays(dep_time, abbreviate = TRUE)) %>%
-      dplyr::mutate(dep_month = lubridate::month(dep_time)) %>% 
-      dplyr::mutate(dep_weekday = factor(dep_weekday, c("Dom","Seg","Ter","Qua",
-                                                        "Qui","Sex","Sáb"))) %>% 
-      dplyr::mutate(dep_month = factor(dep_month, sort(unique(dep_month))))
+      dplyr::mutate(dep_weekday = lubridate::wday(dep_time, label = TRUE, 
+                                               abbr = TRUE)) %>%
+      dplyr::mutate(dep_month = lubridate::month(dep_time, label = TRUE, 
+                                                 abbr = TRUE))
 })
 renderPlot({
    dt <- getFlightData() %>% 
       dplyr::group_by(dep_month, dep_weekday) %>% 
       dplyr::summarise(rate = sum(dep_delay > 0) / n()) %>% 
       dplyr::ungroup()
+   
    ggplot(dt, aes(x = dep_month, y = dep_weekday, fill = rate)) +
       geom_tile(color = "gray93", size = 1, alpha = 0.8) +
       geom_text(aes(label = round(rate, 2)), color = "white") +
       viridis::scale_fill_viridis(direction = -1, guide = "none") +
-      scale_x_discrete(expand = c(.01, .01)) +
-      scale_y_discrete(expand = c(.01, .01)) +
       theme_gray(base_family = "Helvetica", base_size = 14) +
       labs(x = "Month", y = "Weekday")
 })

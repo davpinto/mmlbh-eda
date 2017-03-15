@@ -1,7 +1,7 @@
 ---
 title:  "Análise Exploratória de Dados usando R"
-author: "David Pinto"
-date:   "23 Fev 2017"
+author: "David Pinto | *CAO Nexer Labs*"
+date:   "16 Março 2017"
 output:
   prettydoc::html_pretty:
     theme: hpstr
@@ -15,11 +15,11 @@ output:
 <!-- 4. https://rpubs.com/NickGonzaga11/dplyrtidyr -->
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = FALSE, message = FALSE, 
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, message = FALSE, 
                       warning = FALSE, fig.align = "center")
 ```
 
-> III Meetup ML, Belo Horizonte
+> IV Meetup ML, Belo Horizonte
 
 Neste tutorial você aprenderá a usar o `R` e suas principais bibliotecas de manipulação e visualização de dados para fazer **Análise Exploratória de Dados** (EDA - *Exploratory Data Analysis*).
 
@@ -277,13 +277,13 @@ head(dt, n = 5)
 knitr::kable(head(dt, n = 5))
 ```
 
-O *heamap* permite visualizar 3 variáveis usando apenas 2 dimensões:
+O *heatmap* permite visualizar 3 variáveis usando apenas 2 dimensões:
 
 ```{r}
 g <- ggplot(dt, aes(x = dep_month, y = dep_weekday, fill = rate)) +
    geom_tile(color = "gray93", size = 1, alpha = 0.8) +
    geom_text(aes(label = round(rate, 2)), color = "white") +
-   viridis::scale_fill_viridis(direction = -1, guide = "none") +
+   viridis::scale_fill_viridis(direction = -1, name = "Rate") +
    theme_gray(base_family = "Helvetica", base_size = 14) +
    labs(x = "Month", y = "Weekday")
 plot(g)
@@ -291,7 +291,7 @@ plot(g)
 
 ## Localização dos Aeroportos
 
-Vamos combinar os dados dos vôos com uma nova base de dados, contendo informações detalhadas de cada aeroporto.
+Vamos combinar os dados dos vôos com uma nova base de dados contendo informações detalhadas de cada aeroporto.
 
 ```{r, results='hide'}
 airports <- readr::read_csv("./data/airports.csv.zip")
@@ -302,33 +302,67 @@ head(airports, n = 5)
 knitr::kable(head(airports, n = 5))
 ```
 
-O pacote `ggmap` permite inserir mapas como camadas do `ggplot2`. Vamos utilizá-lo para plotar a localização dos aeroportos de origem e destino:
+O pacote `ggmap` permite inserir mapas como camadas do `ggplot2`. Vamos utilizá-lo para plotar a localização dos aeroportos de destino:
 
-```{r, fig.height=8}
+```{r, fig.height=7}
 library("ggmap")
 
-orig <- airports %>% 
-   dplyr::filter(faa %in% unique(flights$origin))
 dest <- airports %>% 
    dplyr::filter(faa %in% unique(flights$dest))
 
 map <- ggmap::get_map("United States", zoom = 4, maptype = "terrain", 
                       scale = 2, color = "bw")
+
 g <- ggmap::ggmap(map, extent = "device", darken = 0.1) +
    stat_density2d(data = dest, aes(x = lon, y = lat, fill = ..level.., 
                                    alpha = ..level..), 
                   size = 0.01, bins = 10, geom = "polygon") + 
    geom_density2d(data = dest, aes(x = lon, y = lat, color = ..level..), 
                   size = 0.5, bins = 15, alpha = 0.8) + 
-   geom_point(aes(lon, lat), data = dest, size = 2, shape = 18, 
-              alpha = 0.8, color = "black") +
-   geom_point(aes(lon, lat), data = orig, size = 2, shape = 13, 
-              alpha = 0.8, color = "black") +
+   geom_point(aes(lon, lat), data = dest, size = 2, alpha = 0.8, color = "black") +
    scale_color_gradientn(colors = heat.colors(100)[80:5], guide = "none") + 
    scale_fill_gradientn(colors = heat.colors(100)[80:5], guide = "none") + 
    scale_alpha(range = c(0.1, 0.4), guide = "none")
 plot(g)
 ```
+
+Agora, vamos plotar os trajetos dos vôos que saíram de EWR:
+
+```{r, fig.height=7}
+dt <- flights %>% 
+   dplyr::filter(origin == "EWR") %>% 
+   dplyr::rename(faa = dest) %>% 
+   dplyr::left_join(airports, by = "faa") %>% 
+   na.omit() %>% 
+   dplyr::rename(dest = faa, dest_lat = lat, dest_lon = lon)
+dt <- dt %>% 
+   dplyr::select(origin, dest, dest_lat, dest_lon, dep_delay) %>% 
+   dplyr::rename(faa = origin) %>% 
+   dplyr::left_join(airports, by = "faa") %>% 
+   na.omit() %>% 
+   dplyr::rename(origin = faa, orig_lat = lat, orig_lon = lon) %>% 
+   dplyr::select(starts_with("orig"), starts_with("dest"), dep_delay)
+dt <- dt %>%
+   dplyr::filter(dep_delay > 0) %>% 
+   dplyr::group_by(origin, dest) %>% 
+   dplyr::summarise_each(funs(median))
+
+map <- ggmap::get_map("United States", zoom = 4, maptype = "terrain", 
+                      scale = 2, color = "bw")
+
+g <- ggmap::ggmap(map, extent = "device", darken = 0.2) +
+   geom_curve(aes(x = orig_lon, y = orig_lat, xend = dest_lon, yend = dest_lat, 
+                  color = dep_delay, alpha = dep_delay), data = dt, size = .7, curvature = 0.3,
+              alpha = 0.8) +
+   geom_point(aes(x = dest_lon, y = dest_lat), data = dt, color = "red") +
+   geom_text(data = dt, aes(x = dest_lon, y = dest_lat, label = dest), col = "black", 
+             size = 3, nudge_x = .5, nudge_y = .5, fontface = "bold") +
+   coord_cartesian() +
+   viridis::scale_color_viridis(guide = "none", option = "B", direction = -1) +
+   scale_alpha(guide = "none", range = c(0.5, 1))
+plot(g)
+```
+
 
 ## Como usar as ferramentas em produção?
 

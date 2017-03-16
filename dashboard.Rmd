@@ -3,6 +3,7 @@ title: "Heatmap of Delayed Flights"
 author: "David Pinto"
 output: 
   flexdashboard::flex_dashboard:
+    theme: yeti
     orientation: rows
     social: menu
     source_code: embed

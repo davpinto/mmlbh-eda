@@ -1,10 +1,10 @@
 ---
 title:  "Análise Exploratória de Dados usando R"
-author: "David Pinto | *CAO Nexer Labs*"
+author: "David Pinto | CAO *Nexer Labs*"
 date:   "16 Março 2017"
 output:
   prettydoc::html_pretty:
-    theme: hpstr
+    theme: cayman
     highlight: github
 ---
 
@@ -284,6 +284,7 @@ g <- ggplot(dt, aes(x = dep_month, y = dep_weekday, fill = rate)) +
    geom_tile(color = "gray93", size = 1, alpha = 0.8) +
    geom_text(aes(label = round(rate, 2)), color = "white") +
    viridis::scale_fill_viridis(direction = -1, name = "Rate") +
+   guides(fill = guide_colorbar(barwidth = 0.5, barheight = 10)) +
    theme_gray(base_family = "Helvetica", base_size = 14) +
    labs(x = "Month", y = "Weekday")
 plot(g)
@@ -304,7 +305,7 @@ knitr::kable(head(airports, n = 5))
 
 O pacote `ggmap` permite inserir mapas como camadas do `ggplot2`. Vamos utilizá-lo para plotar a localização dos aeroportos de destino:
 
-```{r, fig.height=7}
+```{r, fig.height=8}
 library("ggmap")
 
 dest <- airports %>% 
@@ -328,7 +329,7 @@ plot(g)
 
 Agora, vamos plotar os trajetos dos vôos que saíram de EWR:
 
-```{r, fig.height=7}
+```{r, fig.height=8}
 dt <- flights %>% 
    dplyr::filter(origin == "EWR") %>% 
    dplyr::rename(faa = dest) %>% 
@@ -348,18 +349,18 @@ dt <- dt %>%
    dplyr::summarise_each(funs(median))
 
 map <- ggmap::get_map("United States", zoom = 4, maptype = "terrain", 
-                      scale = 2, color = "bw")
+                      scale = 2, color = "color")
 
-g <- ggmap::ggmap(map, extent = "device", darken = 0.2) +
+g <- ggmap::ggmap(map, extent = "device", darken = 0.5) +
    geom_curve(aes(x = orig_lon, y = orig_lat, xend = dest_lon, yend = dest_lat, 
-                  color = dep_delay, alpha = dep_delay), data = dt, size = .7, curvature = 0.3,
-              alpha = 0.8) +
+                  color = dep_delay), data = dt, size = 0.5, curvature = 0.5) +
    geom_point(aes(x = dest_lon, y = dest_lat), data = dt, color = "red") +
    geom_text(data = dt, aes(x = dest_lon, y = dest_lat, label = dest), col = "black", 
              size = 3, nudge_x = .5, nudge_y = .5, fontface = "bold") +
    coord_cartesian() +
-   viridis::scale_color_viridis(guide = "none", option = "B", direction = -1) +
-   scale_alpha(guide = "none", range = c(0.5, 1))
+   viridis::scale_color_viridis(name = "Avg Delay", option = "B", direction = -1) +
+   guides(color = guide_colorbar(barwidth = 15, barheight = 0.5)) +
+   theme(legend.position = "bottom")
 plot(g)
 ```
 

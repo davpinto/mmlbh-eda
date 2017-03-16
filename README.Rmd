@@ -7,7 +7,7 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Tutorial desenvolvido para o **III Meetup de Machine Learning** de Belo Horizonte.
+> Tutorial desenvolvido para o **IV Meetup de Machine Learning** de Belo Horizonte.
 
 ## Preparação do Ambiente de Desenvolvimento
 

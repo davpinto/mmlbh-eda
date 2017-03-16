@@ -1,7 +1,7 @@
 Análise Exploratória de Dados usando R
 ================
 
-Tutorial desenvolvido para o **III Meetup de Machine Learning** de Belo Horizonte.
+> Tutorial desenvolvido para o **IV Meetup de Machine Learning** de Belo Horizonte.
 
 Preparação do Ambiente de Desenvolvimento
 -----------------------------------------
